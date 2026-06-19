@@ -1,0 +1,106 @@
+import { Component, inject, input, output, signal, OnInit } from '@angular/core';
+import { AuthService } from '../../../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { Notification } from '../../../core/models';
+
+@Component({
+  selector: 'app-header',
+  template: `
+    <header class="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-8">
+      <div class="flex items-center gap-4">
+        <button
+          type="button"
+          class="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+          (click)="toggleSidebar.emit()"
+        >
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <h2 class="text-lg font-semibold text-slate-800">{{ pageTitle() }}</h2>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <button
+            type="button"
+            class="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+            (click)="showNotifications.set(!showNotifications())"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+            @if (unreadCount() > 0) {
+              <span
+                class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
+              >
+                {{ unreadCount() }}
+              </span>
+            }
+          </button>
+
+          @if (showNotifications()) {
+            <div
+              class="absolute right-0 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg"
+            >
+              <div class="border-b border-slate-100 px-4 py-3">
+                <p class="text-sm font-semibold text-slate-900">Notifications</p>
+              </div>
+              <div class="max-h-64 overflow-y-auto">
+                @for (n of notifications(); track n.id) {
+                  <div
+                    class="border-b border-slate-50 px-4 py-3 text-sm"
+                    [class.bg-teal-50]="!n.read"
+                  >
+                    <p class="font-medium text-slate-800">{{ n.title }}</p>
+                    <p class="mt-0.5 text-xs text-slate-500">{{ n.message }}</p>
+                  </div>
+                } @empty {
+                  <p class="px-4 py-6 text-center text-sm text-slate-400">No notifications</p>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        <button
+          type="button"
+          class="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+          (click)="logout()"
+        >
+          Logout
+        </button>
+      </div>
+    </header>
+  `,
+})
+export class HeaderComponent implements OnInit {
+  readonly pageTitle = input('Dashboard');
+  readonly toggleSidebar = output<void>();
+
+  private readonly auth = inject(AuthService);
+  private readonly notificationService = inject(NotificationService);
+
+  readonly showNotifications = signal(false);
+  readonly notifications = signal<Notification[]>([]);
+
+  unreadCount(): number {
+    return this.notifications().filter((n) => !n.read).length;
+  }
+
+  ngOnInit(): void {
+    const user = this.auth.currentUser();
+    if (user) {
+      this.notificationService.getByUser(user.id).subscribe((n) => this.notifications.set(n));
+    }
+  }
+
+  logout(): void {
+    this.auth.logout();
+  }
+}

@@ -1,0 +1,40 @@
+import { Component, input } from '@angular/core';
+
+@Component({
+  selector: 'app-stat-card',
+  template: `
+    <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-sm font-medium text-slate-500">{{ label() }}</p>
+          <p class="mt-2 text-3xl font-bold text-slate-900">{{ value() }}</p>
+          @if (subtitle()) {
+            <p class="mt-1 text-xs text-slate-400">{{ subtitle() }}</p>
+          }
+        </div>
+        @if (icon()) {
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-lg"
+            [class]="iconBgClass()"
+          >
+            <span class="text-lg">{{ icon() }}</span>
+          </div>
+        }
+      </div>
+      @if (trend() !== null && trend() !== undefined) {
+        <p class="mt-3 text-xs" [class]="trend()! >= 0 ? 'text-emerald-600' : 'text-red-500'">
+          {{ trend()! >= 0 ? '↑' : '↓' }} {{ Math.abs(trend()!) }}% vs last week
+        </p>
+      }
+    </div>
+  `,
+})
+export class StatCardComponent {
+  readonly label = input.required<string>();
+  readonly value = input.required<string | number>();
+  readonly subtitle = input<string>();
+  readonly icon = input<string>();
+  readonly iconBgClass = input('bg-teal-50 text-teal-600');
+  readonly trend = input<number | null>(null);
+  protected readonly Math = Math;
+}

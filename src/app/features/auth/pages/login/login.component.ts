@@ -1,0 +1,148 @@
+import { Component, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { AuthService } from '../../../../core/services/auth.service';
+import { DEMO_CREDENTIALS } from '../../../../core/constants/app.constants';
+
+@Component({
+  selector: 'app-login',
+  imports: [ReactiveFormsModule, RouterLink],
+  template: `
+    <div class="flex min-h-screen">
+      <div class="hidden flex-1 flex-col justify-between bg-gradient-to-br from-teal-700 to-teal-900 p-12 text-white lg:flex">
+        <div>
+          <div class="flex items-center gap-3">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 text-2xl font-bold">
+              C
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold">CleanOps</h1>
+              <p class="text-teal-200">Cleaning Operations Management</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h2 class="text-3xl font-bold leading-tight">
+            Manage cleaners, rooms, and tasks with confidence.
+          </h2>
+          <p class="mt-4 text-teal-100">
+            Track attendance, assign rooms, verify cleaning quality, and generate performance
+            reports — all in one platform.
+          </p>
+          <ul class="mt-8 space-y-3 text-sm text-teal-100">
+            <li>✓ Real-time task monitoring</li>
+            <li>✓ QR & GPS verification</li>
+            <li>✓ Photo-based quality checks</li>
+            <li>✓ Role-based dashboards</li>
+          </ul>
+        </div>
+        <p class="text-sm text-teal-300">© 2026 CleanOps. All rights reserved.</p>
+      </div>
+
+      <div class="flex flex-1 items-center justify-center p-6">
+        <div class="w-full max-w-md">
+          <div class="mb-8 lg:hidden">
+            <h1 class="text-2xl font-bold text-slate-900">CleanOps</h1>
+            <p class="text-slate-500">Sign in to your account</p>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <h2 class="text-xl font-bold text-slate-900">Welcome back</h2>
+            <p class="mt-1 text-sm text-slate-500">Enter your credentials to continue</p>
+
+            <form class="mt-6 space-y-4" [formGroup]="form" (ngSubmit)="onSubmit()">
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
+                <input
+                  type="email"
+                  formControlName="email"
+                  class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  placeholder="you@company.com"
+                />
+              </div>
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700">Password</label>
+                <input
+                  type="password"
+                  formControlName="password"
+                  class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              @if (error()) {
+                <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{{ error() }}</div>
+              }
+
+              <button
+                type="submit"
+                [disabled]="form.invalid || loading()"
+                class="w-full rounded-lg bg-teal-600 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
+              >
+                {{ loading() ? 'Signing in...' : 'Sign in' }}
+              </button>
+            </form>
+
+            <p class="mt-4 text-center text-sm text-slate-500">
+              <a routerLink="/auth/forgot-password" class="text-teal-600 hover:underline">
+                Forgot password?
+              </a>
+            </p>
+          </div>
+
+          <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Demo accounts
+            </p>
+            <div class="space-y-2">
+              @for (cred of demoCredentials; track cred.email) {
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-sm hover:bg-teal-50"
+                  (click)="fillDemo(cred.email, cred.password)"
+                >
+                  <span class="font-medium capitalize text-slate-700">{{ cred.role }}</span>
+                  <span class="text-slate-400">{{ cred.email }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `,
+})
+export class LoginComponent {
+  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+
+  readonly demoCredentials = DEMO_CREDENTIALS;
+  readonly loading = signal(false);
+  readonly error = signal('');
+
+  readonly form = this.fb.nonNullable.group({
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', Validators.required],
+  });
+
+  fillDemo(email: string, password: string): void {
+    this.form.patchValue({ email, password });
+  }
+
+  onSubmit(): void {
+    if (this.form.invalid) return;
+    this.loading.set(true);
+    this.error.set('');
+
+    const { email, password } = this.form.getRawValue();
+    this.auth.login(email, password).subscribe({
+      next: () => {
+        this.auth.redirectToHome();
+      },
+      error: (err: Error) => {
+        this.error.set(err.message);
+        this.loading.set(false);
+      },
+    });
+  }
+}
