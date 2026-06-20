@@ -73,10 +73,21 @@ npm run build
 - **Angular 22** (standalone components, lazy routes)
 - **Tailwind CSS v4**
 - **RxJS** for reactive data flow
-- Mock data services (ready for Spring Boot REST API integration)
+- Django REST Framework backend (separate repo/folder)
 
 ## Backend Integration
 
-The app is structured for a Spring Boot + PostgreSQL backend. Replace mock services in `core/services/` with HTTP calls to your REST API. JWT auth interceptor is already configured in `auth.interceptor.ts`.
+The Django REST API lives in a **separate project**:
+
+**[cleaning-operations-system-backend](../cleaning-operations-system-backend)** — sibling folder at `c:\Users\hp\Projects\cleaning-operations-system-backend`
+
+Run the backend on `http://127.0.0.1:8000`, then replace mock services in `core/services/` with HTTP calls. JWT auth interceptor is already configured in `auth.interceptor.ts`.
 
 Environment config: `src/environments/environment.ts`
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://127.0.0.1:8000/api',
+};
+```

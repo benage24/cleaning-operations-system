@@ -127,6 +127,12 @@ export interface DashboardStats {
   averageCleaningTime: number;
 }
 
+export interface AdminDashboardOverview extends DashboardStats {
+  supervisorCount: number;
+  roomCount: number;
+  activeUsers: number;
+}
+
 export interface PerformanceReport {
   cleanerId: string;
   cleanerName: string;

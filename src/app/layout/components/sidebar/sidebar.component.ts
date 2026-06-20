@@ -12,48 +12,7 @@ export interface NavItem {
 @Component({
   selector: 'app-sidebar',
   imports: [RouterLink, RouterLinkActive],
-  template: `
-    <aside
-      class="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0"
-      [class.-translate-x-full]="!open()"
-      [class.translate-x-0]="open()"
-    >
-      <div class="flex h-16 items-center gap-3 border-b border-slate-100 px-6">
-        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 font-bold text-white">
-          C
-        </div>
-        <div>
-          <p class="text-sm font-bold text-slate-900">CleanOps</p>
-          <p class="text-xs text-slate-500">Operations Manager</p>
-        </div>
-      </div>
-
-      <nav class="flex-1 space-y-1 overflow-y-auto p-4">
-        @for (item of navItems(); track item.route) {
-          <a
-            [routerLink]="item.route"
-            routerLinkActive="bg-teal-50 text-teal-700"
-            class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-            (click)="closeSidebar.emit()"
-          >
-            <span class="text-base">{{ item.icon }}</span>
-            {{ item.label }}
-          </a>
-        }
-      </nav>
-
-      <div class="border-t border-slate-100 p-4">
-        <div class="rounded-lg bg-slate-50 p-3">
-          <p class="text-sm font-medium text-slate-900">{{ userName() }}</p>
-          <p class="text-xs text-slate-500">{{ roleLabel() }}</p>
-        </div>
-      </div>
-    </aside>
-
-    @if (open()) {
-      <div class="fixed inset-0 z-20 bg-black/30 lg:hidden" (click)="closeSidebar.emit()"></div>
-    }
-  `,
+  templateUrl: './sidebar.component.html',
 })
 export class SidebarComponent {
   readonly navItems = input.required<NavItem[]>();

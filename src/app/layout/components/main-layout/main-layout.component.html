@@ -1,0 +1,15 @@
+
+<div class="min-h-screen bg-slate-50">
+  <app-sidebar
+    [navItems]="navItems()"
+    [open]="sidebarOpen()"
+    (closeSidebar)="sidebarOpen.set(false)"
+  />
+  <div class="lg:pl-64">
+    <app-header [pageTitle]="pageTitle()" (toggleSidebar)="sidebarOpen.set(true)" />
+    <main class="p-4 lg:p-8">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+  

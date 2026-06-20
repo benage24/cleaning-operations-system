@@ -1,69 +1,81 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of, delay } from 'rxjs';
-import { DashboardStats, PerformanceReport } from '../models';
-import { MockDataService } from './mock-data.service';
+import { Observable, forkJoin } from 'rxjs';
+import { map } from 'rxjs/operators';
+import {
+  AdminDashboardOverview,
+  DashboardStats,
+  PerformanceReport,
+  Room,
+  User,
+} from '../models';
+import { PaginatedResponse } from '../models/api.model';
+import { ApiService } from './api.service';
 
+/**
+ * Loads dashboard metrics and report data from the backend API.
+ */
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
-  private readonly mockData = inject(MockDataService);
+  private readonly api = inject(ApiService);
 
+  /** Returns the main supervisor/admin dashboard statistics. */
   getStats(): Observable<DashboardStats> {
-    const today = new Date().toISOString().split('T')[0];
-    const todayAttendance = this.mockData.attendance.filter((a) => a.date === today);
-    const activeAssignments = this.mockData.assignments.filter((a) => a.isActive);
-
-    const stats: DashboardStats = {
-      totalCleaners: this.mockData.cleaners.filter((c) => c.isActive).length,
-      cleanersPresent: todayAttendance.filter((a) => a.status === 'present' || a.status === 'late')
-        .length,
-      cleanersAbsent: todayAttendance.filter((a) => a.status === 'absent').length,
-      totalRoomsAssigned: activeAssignments.length,
-      roomsCompleted: this.mockData.rooms.filter((r) => r.status === 'clean').length,
-      roomsPending: this.mockData.rooms.filter(
-        (r) => r.status === 'dirty' || r.status === 'in_progress',
-      ).length,
-      roomsOverdue: this.mockData.rooms.filter((r) => r.status === 'overdue').length,
-      tasksAwaitingVerification: this.mockData.tasks.filter(
-        (t) => t.status === 'pending_verification',
-      ).length,
-      completionRate: 78,
-      averageCleaningTime: 42,
-    };
-
-    return of(stats).pipe(delay(300));
+    return this.api.get<DashboardStats>('dashboard/stats/');
   }
 
+  /** Returns weekly room completion chart data. */
   getWeeklyCompletionData(): Observable<{ day: string; completed: number; assigned: number }[]> {
-    return of([
-      { day: 'Mon', completed: 12, assigned: 15 },
-      { day: 'Tue', completed: 14, assigned: 16 },
-      { day: 'Wed', completed: 11, assigned: 14 },
-      { day: 'Thu', completed: 16, assigned: 18 },
-      { day: 'Fri', completed: 13, assigned: 15 },
-      { day: 'Sat', completed: 8, assigned: 10 },
-      { day: 'Sun', completed: 6, assigned: 8 },
-    ]).pipe(delay(200));
+    return this.api.get<{ day: string; completed: number; assigned: number }[]>(
+      'dashboard/weekly-completion/',
+    );
+  }
+
+  /**
+   * Builds the admin dashboard overview by combining stats with
+   * user and room counts from related endpoints.
+   */
+  getAdminOverview(): Observable<AdminDashboardOverview> {
+    return forkJoin({
+      stats: this.getStats(),
+      supervisors: this.api.get<PaginatedResponse<User>>('auth/users/', { role: 'supervisor' }),
+      users: this.api.get<PaginatedResponse<User>>('auth/users/'),
+      rooms: this.api.get<PaginatedResponse<Room>>('rooms/'),
+    }).pipe(
+      map(({ stats, supervisors, users, rooms }) => ({
+        ...stats,
+        supervisorCount: supervisors.count,
+        roomCount: rooms.count,
+        activeUsers: users.results.filter((user) => user.isActive).length,
+      })),
+    );
   }
 }
 
+/**
+ * Loads performance report data and export actions from the backend API.
+ */
 @Injectable({ providedIn: 'root' })
 export class ReportService {
-  private readonly mockData = inject(MockDataService);
+  private readonly api = inject(ApiService);
 
+  /** Returns cleaner performance metrics for the reports page. */
   getPerformanceReports(): Observable<PerformanceReport[]> {
-    const reports: PerformanceReport[] = this.mockData.cleaners.map((c) => ({
-      cleanerId: c.id,
-      cleanerName: `${c.firstName} ${c.lastName}`,
-      roomsCleaned: Math.floor(Math.random() * 20) + 10,
-      completionRate: c.performanceScore,
-      averageTimeMinutes: Math.floor(Math.random() * 20) + 35,
-      attendanceRate: Math.floor(Math.random() * 15) + 85,
-      performanceScore: c.performanceScore,
-    }));
-    return of(reports).pipe(delay(300));
+    return this.api
+      .get<(Omit<PerformanceReport, 'cleanerId'> & { cleanerId: number })[]>(
+        'reports/performance/',
+      )
+      .pipe(
+        map((reports) =>
+          reports.map((report) => ({
+            ...report,
+            cleanerId: String(report.cleanerId),
+          })),
+        ),
+      );
   }
 
+  /** Triggers a report export on the backend. */
   exportReport(type: 'pdf' | 'excel', reportName: string): Observable<{ url: string }> {
-    return of({ url: `#export-${type}-${reportName}` }).pipe(delay(500));
+    return this.api.post<{ url: string }>('reports/export/', { type, reportName });
   }
 }

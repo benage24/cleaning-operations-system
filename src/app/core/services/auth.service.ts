@@ -1,14 +1,24 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, of, throwError, delay, tap } from 'rxjs';
-import { AuthUser, User, UserRole } from '../models';
-import { DEMO_CREDENTIALS, ROLE_HOME_ROUTES, STORAGE_KEYS } from '../constants/app.constants';
-import { MockDataService } from './mock-data.service';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { AuthUser, UserRole } from '../models';
+import { ROLE_HOME_ROUTES, STORAGE_KEYS } from '../constants/app.constants';
+import { ApiService } from './api.service';
 
+interface LoginResponse {
+  token: string;
+  refresh: string;
+  user: Omit<AuthUser, 'token' | 'id'> & { id: number | string };
+}
+
+/**
+ * Manages authentication state, login/logout, and session persistence.
+ */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private readonly api = inject(ApiService);
   private readonly router = inject(Router);
-  private readonly mockData = inject(MockDataService);
 
   private readonly currentUserSignal = signal<AuthUser | null>(this.loadStoredUser());
 
@@ -16,50 +26,37 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this.currentUserSignal() !== null);
   readonly userRole = computed(() => this.currentUserSignal()?.role ?? null);
 
-  login(email: string, password: string): Observable<AuthUser> {
-    const credential = DEMO_CREDENTIALS.find(
-      (c) => c.email === email && c.password === password,
-    );
-
-    if (!credential) {
-      return throwError(() => new Error('Invalid email or password')).pipe(delay(400));
-    }
-
-    const user = this.mockData.users.find((u) => u.email === email);
-    if (!user || !user.isActive) {
-      return throwError(() => new Error('Account is inactive')).pipe(delay(400));
-    }
-
-    const authUser: AuthUser = {
-      ...user,
-      token: `mock-jwt-${user.id}-${Date.now()}`,
-    };
-
-    return of(authUser).pipe(
-      delay(500),
-      tap((u) => this.setSession(u)),
+  /** Authenticates a user and stores the returned JWT session. */
+  login(username: string, password: string): Observable<AuthUser> {
+    return this.api.post<LoginResponse>('auth/login/', { username, password }).pipe(
+      map((response) => {
+        const user = this.toAuthUser(response);
+        this.setSession(user, response.refresh);
+        return user;
+      }),
     );
   }
 
+  /** Clears the stored session and redirects to the login page. */
   logout(): void {
     localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_REFRESH);
     this.currentUserSignal.set(null);
     this.router.navigate(['/auth/login']);
   }
 
+  /** Requests a password reset email for the given address. */
   requestPasswordReset(email: string): Observable<{ message: string }> {
-    const exists = this.mockData.users.some((u) => u.email === email);
-    if (!exists) {
-      return throwError(() => new Error('No account found with this email')).pipe(delay(400));
-    }
-    return of({ message: 'Password reset link sent to your email.' }).pipe(delay(600));
+    return this.api.post<{ message: string }>('auth/password-reset/', { email });
   }
 
+  /** Checks whether the current user has one of the allowed roles. */
   hasRole(roles: UserRole[]): boolean {
     const role = this.userRole();
     return role !== null && roles.includes(role);
   }
 
+  /** Navigates the authenticated user to their role-specific home route. */
   redirectToHome(): void {
     const role = this.userRole();
     if (role) {
@@ -67,11 +64,25 @@ export class AuthService {
     }
   }
 
-  private setSession(user: AuthUser): void {
+  /** Maps the API login payload into the app's AuthUser model. */
+  private toAuthUser(response: LoginResponse): AuthUser {
+    return {
+      ...response.user,
+      id: String(response.user.id),
+      token: response.token,
+    };
+  }
+
+  /** Persists the authenticated user and optional refresh token. */
+  private setSession(user: AuthUser, refreshToken?: string): void {
     localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(user));
+    if (refreshToken) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_REFRESH, refreshToken);
+    }
     this.currentUserSignal.set(user);
   }
 
+  /** Restores a previously saved session from local storage. */
   private loadStoredUser(): AuthUser | null {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.AUTH_USER);

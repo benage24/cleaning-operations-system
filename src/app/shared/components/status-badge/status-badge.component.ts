@@ -2,11 +2,7 @@ import { Component, input } from '@angular/core';
 
 @Component({
   selector: 'app-status-badge',
-  template: `
-    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" [class]="badgeClass()">
-      {{ label() }}
-    </span>
-  `,
+  templateUrl: './status-badge.component.html',
 })
 export class StatusBadgeComponent {
   readonly status = input.required<string>();

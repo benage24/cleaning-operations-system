@@ -5,7 +5,7 @@ import { NavItem } from '../../layout/components/sidebar/sidebar.component';
 @Component({
   selector: 'app-admin-shell',
   imports: [MainLayoutComponent],
-  template: `<app-main-layout [navItems]="navItems" pageTitle="Admin Portal" />`,
+  templateUrl: './admin-shell.component.html',
 })
 export class AdminShellComponent {
   readonly navItems: NavItem[] = [

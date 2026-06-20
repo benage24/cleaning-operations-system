@@ -11,30 +11,7 @@ import { StatusLabelPipe } from '../../../../shared/pipes/status-label.pipe';
 @Component({
   selector: 'app-cleaner-history',
   imports: [RouterLink, DatePipe, StatusBadgeComponent, StatusLabelPipe],
-  template: `
-    <div class="mx-auto max-w-lg">
-      <a routerLink="/cleaner/home" class="mb-4 inline-flex items-center text-sm text-teal-600">
-        ← Back
-      </a>
-      <h1 class="mb-6 text-2xl font-bold text-slate-900">Task History</h1>
-
-      <div class="space-y-3">
-        @for (task of tasks(); track task.id) {
-          <div class="rounded-xl border border-slate-200 bg-white p-4">
-            <div class="flex items-center justify-between">
-              <p class="font-semibold text-slate-900">{{ getRoomName(task.roomId) }}</p>
-              <app-status-badge [status]="task.status" [label]="task.status | statusLabel" />
-            </div>
-            @if (task.completedAt) {
-              <p class="mt-1 text-sm text-slate-500">Completed: {{ task.completedAt | date: 'medium' }}</p>
-            }
-          </div>
-        } @empty {
-          <p class="py-8 text-center text-slate-500">No task history yet</p>
-        }
-      </div>
-    </div>
-  `,
+  templateUrl: './cleaner-history.component.html',
 })
 export class CleanerHistoryComponent implements OnInit {
   private readonly auth = inject(AuthService);

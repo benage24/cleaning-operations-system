@@ -5,7 +5,7 @@ import { NavItem } from '../../layout/components/sidebar/sidebar.component';
 @Component({
   selector: 'app-supervisor-shell',
   imports: [MainLayoutComponent],
-  template: `<app-main-layout [navItems]="navItems" pageTitle="Supervisor Portal" />`,
+  templateUrl: './supervisor-shell.component.html',
 })
 export class SupervisorShellComponent {
   readonly navItems: NavItem[] = [
