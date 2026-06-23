@@ -1,48 +1,74 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of, delay } from 'rxjs';
-import { Cleaner, EmploymentStatus } from '../models';
-import { MockDataService } from './mock-data.service';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { Cleaner } from '../models';
+import { PaginatedResponse } from '../models/api.model';
+import { ApiService } from './api.service';
 
+type ApiCleaner = Omit<Cleaner, 'id' | 'supervisorId'> & {
+  id: number;
+  supervisorId?: number | null;
+};
+
+/** Maps a cleaner payload from the API into the app Cleaner model. */
+function mapCleaner(cleaner: ApiCleaner): Cleaner {
+  return {
+    ...cleaner,
+    id: String(cleaner.id),
+    supervisorId: cleaner.supervisorId != null ? String(cleaner.supervisorId) : undefined,
+  };
+}
+
+/**
+ * Loads and manages cleaner profiles from the backend API.
+ */
 @Injectable({ providedIn: 'root' })
 export class CleanerService {
-  private readonly mockData = inject(MockDataService);
+  private readonly api = inject(ApiService);
 
+  /** Returns all cleaners from the API. */
   getAll(): Observable<Cleaner[]> {
-    return of([...this.mockData.cleaners]).pipe(delay(200));
+    return this.api.get<PaginatedResponse<ApiCleaner>>('cleaners/').pipe(
+      map((response) => response.results.map(mapCleaner)),
+    );
   }
 
+  /** Returns a single cleaner by user id. */
   getById(id: string): Observable<Cleaner | undefined> {
-    return of(this.mockData.cleaners.find((c) => c.id === id)).pipe(delay(150));
+    return this.api.get<ApiCleaner>(`cleaners/${id}/`).pipe(map(mapCleaner));
   }
 
+  /** Creates a new cleaner profile. */
   create(cleaner: Partial<Cleaner>): Observable<Cleaner> {
-    const newCleaner: Cleaner = {
-      id: `u${Date.now()}`,
-      email: cleaner.email ?? '',
-      firstName: cleaner.firstName ?? '',
-      lastName: cleaner.lastName ?? '',
-      role: 'cleaner',
-      phone: cleaner.phone,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      employeeId: cleaner.employeeId ?? `CLN-${Date.now()}`,
-      employmentStatus: cleaner.employmentStatus ?? 'active',
-      hireDate: cleaner.hireDate ?? new Date().toISOString().split('T')[0],
-      performanceScore: 0,
-      supervisorId: cleaner.supervisorId,
-    };
-    this.mockData.cleaners.push(newCleaner);
-    return of(newCleaner).pipe(delay(300));
+    return this.api
+      .post<ApiCleaner>('cleaners/', {
+        email: cleaner.email,
+        firstName: cleaner.firstName,
+        lastName: cleaner.lastName,
+        phone: cleaner.phone ?? '',
+        employeeId: cleaner.employeeId ?? `CLN-${Date.now()}`,
+        hireDate: cleaner.hireDate ?? new Date().toISOString().split('T')[0],
+        supervisorId: cleaner.supervisorId ? Number(cleaner.supervisorId) : undefined,
+      })
+      .pipe(map(mapCleaner));
   }
 
+  /** Updates an existing cleaner profile. */
   update(id: string, updates: Partial<Cleaner>): Observable<Cleaner> {
-    const index = this.mockData.cleaners.findIndex((c) => c.id === id);
-    if (index === -1) throw new Error('Cleaner not found');
-    this.mockData.cleaners[index] = { ...this.mockData.cleaners[index], ...updates };
-    return of(this.mockData.cleaners[index]).pipe(delay(300));
+    return this.api
+      .patch<ApiCleaner>(`cleaners/${id}/`, {
+        email: updates.email,
+        firstName: updates.firstName,
+        lastName: updates.lastName,
+        phone: updates.phone,
+        employmentStatus: updates.employmentStatus,
+        supervisorId: updates.supervisorId ? Number(updates.supervisorId) : undefined,
+      })
+      .pipe(map(mapCleaner));
   }
 
+  /** Deactivates a cleaner via the backend deactivate action. */
   deactivate(id: string): Observable<Cleaner> {
-    return this.update(id, { employmentStatus: 'inactive' as EmploymentStatus, isActive: false });
+    return this.api.post<ApiCleaner>(`cleaners/${id}/deactivate/`, {}).pipe(map(mapCleaner));
   }
 }
