@@ -6,24 +6,26 @@ import { HttpErrorResponse } from '@angular/common/http';
  */
 export function parseHttpError(error: HttpErrorResponse): string {
   const body = error.error;
-  let message = 'Something went wrong. Please try again.';
 
   if (typeof body === 'string') {
     return body;
   }
 
-  if (body?.non_field_errors?.[0]) {
-    return body.non_field_errors[0];
+  if (body?.non_field_errors?.length) {
+    return body.non_field_errors.join(' ');
   }
 
   if (body?.detail) {
-    return typeof body.detail === 'string' ? body.detail : body.detail[0];
+    return typeof body.detail === 'string' ? body.detail : body.detail.join(' ');
   }
 
   if (typeof body === 'object' && body !== null) {
-    const firstKey = Object.keys(body)[0];
-    if (firstKey && Array.isArray(body[firstKey])) {
-      return body[firstKey][0];
+    const fieldMessages = Object.entries(body)
+      .filter(([, value]) => Array.isArray(value) && value.length)
+      .map(([field, value]) => `${field}: ${(value as string[]).join(' ')}`);
+
+    if (fieldMessages.length) {
+      return fieldMessages.join(' | ');
     }
   }
 
@@ -31,5 +33,5 @@ export function parseHttpError(error: HttpErrorResponse): string {
     return 'Unable to reach the server. Check that the backend is running.';
   }
 
-  return message;
+  return 'Something went wrong. Please try again.';
 }

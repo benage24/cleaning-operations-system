@@ -9,6 +9,7 @@ import { StatusLabelPipe } from '../../../../shared/pipes/status-label.pipe';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CleanerService } from '../../../../core/services/cleaner.service';
 import { Cleaner } from '../../../../core/models';
+import { CleanerEntity } from '../../../../shared/entities';
 
 /**
  * Supervisor page for listing, creating, and deactivating cleaners.
@@ -47,7 +48,7 @@ export class CleanersListComponent implements OnInit {
   /** Controls visibility of the add-cleaner form. */
   readonly showForm = signal(false);
 
-  newCleaner = { firstName: '', lastName: '', email: '', phone: '' };
+  newCleaner = CleanerEntity.empty();
 
   ngOnInit(): void {
     this.loadCleaners();
@@ -81,18 +82,19 @@ export class CleanersListComponent implements OnInit {
 
   /** Validates the form and creates a new cleaner through the API. */
   addCleaner(): void {
-    const { firstName, lastName, email, phone } = this.newCleaner;
-    if (!firstName || !lastName || !email) {
+    if (!this.newCleaner.isValid()) {
       this.actionError.set('First name, last name, and email are required.');
       return;
     }
 
     const supervisorId = this.authService.currentUser()?.id;
+    const cleaner = this.buildCleanerEntity(supervisorId);
+
     this.saving.set(true);
     this.actionError.set(null);
 
     this.cleanerService
-      .create({ firstName, lastName, email, phone, supervisorId })
+      .create(cleaner)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.saving.set(false)),
@@ -124,7 +126,7 @@ export class CleanersListComponent implements OnInit {
   /** Resets the form and reloads the list after a successful create. */
   private handleCleanerCreated(): void {
     this.showForm.set(false);
-    this.newCleaner = { firstName: '', lastName: '', email: '', phone: '' };
+    this.newCleaner.reset();
     this.loadCleaners();
   }
 
@@ -136,5 +138,13 @@ export class CleanersListComponent implements OnInit {
   /** Stores create/deactivate errors for display in the template. */
   private handleActionError(err: Error): void {
     this.actionError.set(err.message);
+  }
+
+  /**
+   * Builds a CleanerEntity ready for the create API request.
+   * Applies defaults for optional fields before posting.
+   */
+  private buildCleanerEntity(supervisorId?: string): CleanerEntity {
+    return new CleanerEntity({ ...this.newCleaner }).prepareForCreate(supervisorId);
   }
 }

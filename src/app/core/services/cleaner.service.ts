@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Cleaner } from '../models';
 import { PaginatedResponse } from '../models/api.model';
+import { CleanerEntity } from '../../shared/entities';
 import { ApiService } from './api.service';
 
 type ApiCleaner = Omit<Cleaner, 'id' | 'supervisorId'> & {
@@ -16,6 +17,8 @@ function mapCleaner(cleaner: ApiCleaner): Cleaner {
     ...cleaner,
     id: String(cleaner.id),
     supervisorId: cleaner.supervisorId != null ? String(cleaner.supervisorId) : undefined,
+    employmentStatus: cleaner.employmentStatus ?? 'active',
+    isActive: cleaner.isActive ?? true,
   };
 }
 
@@ -39,17 +42,9 @@ export class CleanerService {
   }
 
   /** Creates a new cleaner profile. */
-  create(cleaner: Partial<Cleaner>): Observable<Cleaner> {
+  create(cleaner: CleanerEntity): Observable<Cleaner> {
     return this.api
-      .post<ApiCleaner>('cleaners/', {
-        email: cleaner.email,
-        firstName: cleaner.firstName,
-        lastName: cleaner.lastName,
-        phone: cleaner.phone ?? '',
-        employeeId: cleaner.employeeId ?? `CLN-${Date.now()}`,
-        hireDate: cleaner.hireDate ?? new Date().toISOString().split('T')[0],
-        supervisorId: cleaner.supervisorId ? Number(cleaner.supervisorId) : undefined,
-      })
+      .post<ApiCleaner>('cleaners/', cleaner.toCreatePayload())
       .pipe(map(mapCleaner));
   }
 
