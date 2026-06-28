@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: '/api',
+  apiUrl: 'https://cleanops-api-gxf2.onrender.com/api',
   appName: 'CleanOps',
 };
