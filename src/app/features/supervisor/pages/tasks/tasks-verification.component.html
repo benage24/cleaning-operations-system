@@ -1,15 +1,201 @@
 
 <app-page-header
   title="Task Verification"
-  description="Review and approve completed cleaning tasks"
-/>
+  description="Create, review, and verify cleaning tasks"
+>
+  <!-- <button
+    type="button"
+    class="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:opacity-50"
+    [disabled]="isFormBusy() || isListBusy()"
+    (click)="toggleForm()"
+  >
+    <span class="text-base leading-none">{{ showForm() ? '×' : '+' }}</span>
+    {{ showForm() ? 'Close Form' : 'New Task' }}
+  </button> -->
+</app-page-header>
+
+@if (actionError()) {
+  <div class="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <span class="mt-0.5 text-base">!</span>
+    <p>{{ actionError() }}</p>
+  </div>
+}
+
+@if (!loading() && !error()) {
+  <div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-sm font-medium text-slate-500">Showing</p>
+      <p class="mt-2 text-3xl font-bold text-slate-900">{{ stats().total }}</p>
+    </div>
+    <div class="rounded-2xl border border-purple-200 bg-purple-50/50 p-5 shadow-sm">
+      <p class="text-sm font-medium text-purple-700">Pending Verification</p>
+      <p class="mt-2 text-3xl font-bold text-purple-800">{{ stats().pending }}</p>
+    </div>
+    <div class="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 shadow-sm">
+      <p class="text-sm font-medium text-blue-700">In Progress</p>
+      <p class="mt-2 text-3xl font-bold text-blue-800">{{ stats().inProgress }}</p>
+    </div>
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
+      <p class="text-sm font-medium text-emerald-700">Approved</p>
+      <p class="mt-2 text-3xl font-bold text-emerald-800">{{ stats().approved }}</p>
+    </div>
+  </div>
+
+  <div class="mb-6 flex flex-wrap gap-2">
+    @for (option of filterOptions; track option.value) {
+      <button
+        type="button"
+        class="rounded-full px-4 py-2 text-sm font-medium transition"
+        [class.bg-teal-600]="statusFilter() === option.value"
+        [class.text-white]="statusFilter() === option.value"
+        [class.bg-white]="statusFilter() !== option.value"
+        [class.text-slate-600]="statusFilter() !== option.value"
+        [class.border]="statusFilter() !== option.value"
+        [class.border-slate-200]="statusFilter() !== option.value"
+        [disabled]="isListBusy()"
+        (click)="setStatusFilter(option.value)"
+      >
+        {{ option.label }}
+      </button>
+    }
+  </div>
+}
+
+@if (showForm()) {
+  <div class="relative mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    @if (isFormBusy()) {
+      <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+        <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-teal-200 border-t-teal-600"></div>
+          <span class="text-sm font-medium text-slate-600">
+            {{ saving() ? 'Creating task...' : 'Loading form data...' }}
+          </span>
+        </div>
+      </div>
+    }
+
+    <div class="border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white px-6 py-4">
+      <h3 class="text-lg font-semibold text-slate-900">Create Task</h3>
+      <p class="mt-1 text-sm text-slate-500">
+        Assign a cleaning task to a cleaner for a specific room.
+      </p>
+    </div>
+
+    <div class="grid gap-5 p-6 lg:grid-cols-2">
+      <label class="block lg:col-span-2">
+        <span class="mb-1.5 block text-sm font-medium text-slate-700">From Assignment (optional)</span>
+        <select
+          [(ngModel)]="newTask.assignmentId"
+          class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm disabled:bg-slate-50"
+          [disabled]="isFormBusy()"
+          (ngModelChange)="onAssignmentSelected($event)"
+        >
+          <option value="">Select an active assignment</option>
+          @for (assignment of activeAssignments(); track assignment.id) {
+            <option [value]="assignment.id">
+              {{ getRoomName(assignment.roomId) }} → {{ getCleanerName(assignment.cleanerId) }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="mb-1.5 block text-sm font-medium text-slate-700">Room</span>
+        <select
+          [(ngModel)]="newTask.roomId"
+          class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm disabled:bg-slate-50"
+          [disabled]="isFormBusy()"
+        >
+          <option value="">Select room</option>
+          @for (room of rooms(); track room.id) {
+            <option [value]="room.id">{{ room.name }} ({{ room.number }})</option>
+          }
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="mb-1.5 block text-sm font-medium text-slate-700">Cleaner</span>
+        <select
+          [(ngModel)]="newTask.cleanerId"
+          class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm disabled:bg-slate-50"
+          [disabled]="isFormBusy()"
+        >
+          <option value="">Select cleaner</option>
+          @for (cleaner of cleaners(); track cleaner.id) {
+            @if (cleaner.isActive) {
+              <option [value]="cleaner.id">{{ cleaner.firstName }} {{ cleaner.lastName }}</option>
+            }
+          }
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="mb-1.5 block text-sm font-medium text-slate-700">Estimated Duration (minutes)</span>
+        <input
+          type="number"
+          min="1"
+          [(ngModel)]="newTask.estimatedDurationMinutes"
+          class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm disabled:bg-slate-50"
+          [disabled]="isFormBusy()"
+        />
+      </label>
+
+      <label class="block">
+        <span class="mb-1.5 block text-sm font-medium text-slate-700">Initial Status</span>
+        <select
+          [(ngModel)]="newTask.status"
+          class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm disabled:bg-slate-50"
+          [disabled]="isFormBusy()"
+        >
+          @for (status of taskStatuses; track status) {
+            <option [value]="status">{{ status | statusLabel }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <div class="border-t border-slate-100 px-6 py-4">
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        [disabled]="isFormBusy()"
+        (click)="createTask()"
+      >
+        @if (saving()) {
+          <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+        }
+        {{ saving() ? 'Creating...' : 'Create Task' }}
+      </button>
+    </div>
+  </div>
+}
 
 @if (loading()) {
   <app-loading-spinner />
+} @else if (error()) {
+  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ error() }}
+  </div>
+  <button
+    type="button"
+    class="mt-4 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+    (click)="loadTasks(true)"
+  >
+    Try again
+  </button>
 } @else {
-  <div class="space-y-4">
+  <div class="relative space-y-4">
+    @if (refreshing()) {
+      <div class="absolute inset-0 z-10 flex items-start justify-center bg-white/70 pt-16 backdrop-blur-[1px]">
+        <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-teal-200 border-t-teal-600"></div>
+          <span class="text-sm font-medium text-slate-600">Refreshing tasks...</span>
+        </div>
+      </div>
+    }
+
     @for (task of tasks(); track task.id) {
-      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 class="text-lg font-semibold text-slate-900">{{ getRoomName(task.roomId) }}</h3>
@@ -20,29 +206,65 @@
               [label]="task.status | statusLabel"
             />
           </div>
+
           @if (task.status === 'pending_verification') {
-            <div class="flex gap-2">
-              <button
-                type="button"
-                class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-                (click)="verify(task.id, 'approve')"
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                class="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
-                (click)="verify(task.id, 're_cleaning')"
-              >
-                Re-clean
-              </button>
-              <button
-                type="button"
-                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white"
-                (click)="verify(task.id, 'reject')"
-              >
-                Reject
-              </button>
+            <div class="min-w-[16rem] flex-1 space-y-3 sm:max-w-md">
+              <label class="block">
+                <span class="mb-1 block text-xs font-medium text-slate-600">Rating (optional)</span>
+                <select
+                  [(ngModel)]="verifyRatings[task.id]"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                  [disabled]="isVerifying(task.id)"
+                >
+                  <option [ngValue]="null">No rating</option>
+                  @for (score of [1, 2, 3, 4, 5]; track score) {
+                    <option [ngValue]="score">{{ score }} / 5</option>
+                  }
+                </select>
+              </label>
+
+              <label class="block">
+                <span class="mb-1 block text-xs font-medium text-slate-600">
+                  Notes (required for reject / re-clean)
+                </span>
+                <textarea
+                  [(ngModel)]="verifyReasons[task.id]"
+                  rows="2"
+                  placeholder="Add verification notes..."
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                  [disabled]="isVerifying(task.id)"
+                ></textarea>
+              </label>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  [disabled]="isVerifying(task.id)"
+                  (click)="verify(task, 'approve')"
+                >
+                  @if (isVerifying(task.id)) {
+                    <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                  }
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  [disabled]="isVerifying(task.id)"
+                  (click)="verify(task, 're_cleaning')"
+                >
+                  Re-clean
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  [disabled]="isVerifying(task.id)"
+                  (click)="verify(task, 'reject')"
+                >
+                  Reject
+                </button>
+              </div>
             </div>
           }
         </div>
@@ -52,13 +274,21 @@
             @if (task.beforePhotoUrl) {
               <div>
                 <p class="mb-2 text-xs font-medium text-slate-500">Before Cleaning</p>
-                <img [src]="task.beforePhotoUrl" alt="Before" class="rounded-lg border border-slate-200" />
+                <img
+                  [src]="task.beforePhotoUrl"
+                  alt="Before cleaning"
+                  class="max-h-64 w-full rounded-lg border border-slate-200 object-cover"
+                />
               </div>
             }
             @if (task.afterPhotoUrl) {
               <div>
                 <p class="mb-2 text-xs font-medium text-slate-500">After Cleaning</p>
-                <img [src]="task.afterPhotoUrl" alt="After" class="rounded-lg border border-slate-200" />
+                <img
+                  [src]="task.afterPhotoUrl"
+                  alt="After cleaning"
+                  class="max-h-64 w-full rounded-lg border border-slate-200 object-cover"
+                />
               </div>
             }
           </div>
@@ -66,22 +296,41 @@
 
         <div class="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
           @if (task.qrVerified) {
-            <span class="rounded bg-teal-50 px-2 py-1 text-teal-700">✓ QR Verified</span>
+            <span class="rounded bg-teal-50 px-2 py-1 text-teal-700">QR Verified</span>
           }
           @if (task.gpsStart) {
-            <span class="rounded bg-blue-50 px-2 py-1 text-blue-700">✓ GPS Recorded</span>
+            <span class="rounded bg-blue-50 px-2 py-1 text-blue-700">GPS at start</span>
+          }
+          @if (task.gpsComplete) {
+            <span class="rounded bg-blue-50 px-2 py-1 text-blue-700">GPS at completion</span>
           }
           @if (task.startedAt) {
-            <span>Started: {{ task.startedAt | date: 'short' }}</span>
+            <span>Started: {{ task.startedAt | date: 'medium' }}</span>
           }
           @if (task.completedAt) {
-            <span>Completed: {{ task.completedAt | date: 'short' }}</span>
+            <span>Completed: {{ task.completedAt | date: 'medium' }}</span>
+          }
+          @if (task.verifiedAt) {
+            <span>Verified: {{ task.verifiedAt | date: 'medium' }}</span>
+          }
+          @if (task.supervisorRating) {
+            <span>Rating: {{ task.supervisorRating }}/5</span>
+          }
+          @if (task.rejectionReason) {
+            <span class="text-red-600">Reason: {{ task.rejectionReason }}</span>
           }
         </div>
       </div>
     } @empty {
-      <p class="py-12 text-center text-slate-500">No tasks to display</p>
+      <div class="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
+        <p class="text-slate-500">
+          @if (loadingReferences()) {
+            Loading task details...
+          } @else {
+            No tasks found for this filter.
+          }
+        </p>
+      </div>
     }
   </div>
 }
-  

@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { CleaningTask, GpsCoordinates, TaskStatus } from '../models';
 import { PaginatedResponse } from '../models/api.model';
+import { TaskEntity } from '../../shared/entities';
 import { ApiService } from './api.service';
 
 type ApiCleaningTask = Omit<CleaningTask, 'id' | 'roomId' | 'cleanerId' | 'assignmentId' | 'verifiedBy'> & {
@@ -46,6 +47,13 @@ export class TaskService {
       .pipe(map((response) => response.results.map(mapTask)));
   }
 
+  /** Returns tasks filtered by status. */
+  getByStatus(status: TaskStatus): Observable<CleaningTask[]> {
+    return this.api
+      .get<PaginatedResponse<ApiCleaningTask>>('tasks/', { status })
+      .pipe(map((response) => response.results.map(mapTask)));
+  }
+
   /** Returns tasks waiting for supervisor verification. */
   getPendingVerification(): Observable<CleaningTask[]> {
     return this.api
@@ -56,6 +64,11 @@ export class TaskService {
   /** Returns a single task by id. */
   getById(id: string): Observable<CleaningTask | undefined> {
     return this.api.get<ApiCleaningTask>(`tasks/${id}/`).pipe(map(mapTask));
+  }
+
+  /** POST /api/tasks/ */
+  create(task: TaskEntity): Observable<CleaningTask> {
+    return this.api.post<ApiCleaningTask>('tasks/', task.toCreatePayload()).pipe(map(mapTask));
   }
 
   /** Creates a task from an active room assignment. */
