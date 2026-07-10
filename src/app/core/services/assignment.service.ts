@@ -1,68 +1,78 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of, delay } from 'rxjs';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { RoomAssignment } from '../models';
-import { MockDataService } from './mock-data.service';
-import { NotificationService } from './notification.service';
+import { PaginatedResponse } from '../models/api.model';
+import { AssignmentEntity } from '../../shared/entities';
+import { ApiService } from './api.service';
 
+type ApiRoomAssignment = Omit<RoomAssignment, 'id' | 'roomId' | 'cleanerId' | 'assignedBy'> & {
+  id: number;
+  roomId: number;
+  cleanerId: number;
+  assignedBy: number | null;
+};
+
+/** Maps an assignment payload from the API into the app RoomAssignment model. */
+function mapAssignment(assignment: ApiRoomAssignment): RoomAssignment {
+  return {
+    ...assignment,
+    id: String(assignment.id),
+    roomId: String(assignment.roomId),
+    cleanerId: String(assignment.cleanerId),
+    assignedBy: assignment.assignedBy != null ? String(assignment.assignedBy) : '',
+  };
+}
+
+/**
+ * Loads and manages room assignments from the backend API.
+ */
 @Injectable({ providedIn: 'root' })
 export class AssignmentService {
-  private readonly mockData = inject(MockDataService);
-  private readonly notificationService = inject(NotificationService);
+  private readonly api = inject(ApiService);
 
+  /** GET /api/assignments/ */
   getAll(): Observable<RoomAssignment[]> {
-    return of([...this.mockData.assignments]).pipe(delay(200));
-  }
-
-  getByCleaner(cleanerId: string): Observable<RoomAssignment[]> {
-    return of(this.mockData.assignments.filter((a) => a.cleanerId === cleanerId && a.isActive)).pipe(
-      delay(200),
+    return this.api.get<PaginatedResponse<ApiRoomAssignment>>('assignments/').pipe(
+      map((response) => response.results.map(mapAssignment)),
     );
   }
 
-  assign(roomIds: string[], cleanerId: string, assignedBy: string): Observable<RoomAssignment[]> {
-    const created: RoomAssignment[] = roomIds.map((roomId) => {
-      const existing = this.mockData.assignments.find(
-        (a) => a.roomId === roomId && a.isActive,
-      );
-      if (existing) {
-        existing.isActive = false;
-      }
-      const assignment: RoomAssignment = {
-        id: `a${Date.now()}-${roomId}`,
-        roomId,
-        cleanerId,
-        assignedBy,
-        assignedAt: new Date().toISOString(),
-        isActive: true,
-      };
-      this.mockData.assignments.push(assignment);
-      return assignment;
-    });
-
-    this.notificationService.add({
-      userId: cleanerId,
-      title: 'New Room Assignment',
-      message: `You have been assigned ${roomIds.length} room(s).`,
-      type: 'info',
-    });
-
-    return of(created).pipe(delay(300));
+  /** GET /api/assignments/{id}/ */
+  getById(id: string): Observable<RoomAssignment> {
+    return this.api.get<ApiRoomAssignment>(`assignments/${id}/`).pipe(map(mapAssignment));
   }
 
-  reassign(assignmentId: string, newCleanerId: string): Observable<RoomAssignment> {
-    const assignment = this.mockData.assignments.find((a) => a.id === assignmentId);
-    if (!assignment) throw new Error('Assignment not found');
-    assignment.isActive = false;
+  /** Returns active assignments for a specific cleaner. */
+  getByCleaner(cleanerId: string): Observable<RoomAssignment[]> {
+    return this.getAll().pipe(
+      map((assignments) =>
+        assignments.filter((assignment) => assignment.cleanerId === cleanerId && assignment.isActive),
+      ),
+    );
+  }
 
-    const newAssignment: RoomAssignment = {
-      id: `a${Date.now()}`,
-      roomId: assignment.roomId,
-      cleanerId: newCleanerId,
-      assignedBy: assignment.assignedBy,
-      assignedAt: new Date().toISOString(),
-      isActive: true,
-    };
-    this.mockData.assignments.push(newAssignment);
-    return of(newAssignment).pipe(delay(300));
+  /** POST /api/assignments/bulk-assign/ */
+  bulkAssign(assignment: AssignmentEntity): Observable<RoomAssignment[]> {
+    return this.api
+      .post<ApiRoomAssignment | ApiRoomAssignment[]>(
+        'assignments/bulk-assign/',
+        assignment.toBulkAssignPayload(),
+      )
+      .pipe(
+        map((response) => {
+          const items = Array.isArray(response) ? response : [response];
+          return items.map(mapAssignment);
+        }),
+      );
+  }
+
+  /** POST /api/assignments/{id}/reassign/ */
+  reassign(assignmentId: string, newCleanerId: string): Observable<RoomAssignment> {
+    return this.api
+      .post<ApiRoomAssignment>(`assignments/${assignmentId}/reassign/`, {
+        newCleanerId: Number(newCleanerId),
+      })
+      .pipe(map(mapAssignment));
   }
 }
